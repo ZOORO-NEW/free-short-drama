@@ -1,12 +1,12 @@
-# free-short-drama · 免费短视频全自动流水线
+# free-short-drama · 短视频全自动流水线
 
 一个 **零外部依赖、可独立安装** 的 WorkBuddy 技能：输入一句话想法或一段文案，全自动产出「成片 + 素材包 + 宣发物料」。
 
-- **生图**：WorkBuddy 内置免费混元 Hy Image 3.5（中文文字准确度高）
+- **生图**：优先 Agnes 免费档（`agnes_generate_image`，需在连接器官方页信任 `agnes-ai` MCP 并填免费档密钥）；未配置时退回内置 ImageGen（Hy Image 3.5，按张消耗平台积分约 5-10/张）
 - **图生视频**：Agnes 免费档（可选，未配置则退化为关键帧 + 本地合成说明）
 - **配音**：edge-tts（免费）
 - **合成**：本地 ffmpeg（免费）
-- **全流程外部花费 ≈ 0**
+- **全流程外部花费 ≈ 0（生图优先 Agnes 免费档；若退回 ImageGen 则按张消耗平台积分）**
 
 > 与作者的 `short-drama-autopilot` 不同，本技能**不依赖任何 qianjin-* 技能**——所有写作 / 分镜 / 形象 / 配音方法论已内嵌。若你的机器上装有 `qianjin-*` 系列，会自动增强；没有也完整可用。
 
@@ -25,11 +25,11 @@
 ## 两个可选前提
 - **图生视频（动图）**：在连接器官方页信任 `agnes-ai` MCP，填入**你自己的** Agnes 免费档密钥（免费档即够，串行间隔 ≥30s 防 429）。
 - **本地合成**：确保机器装了 `ffmpeg` 且可在命令行调用（Windows 可用 `winget install Gyan.FFmpeg`）。未装也能用——技能会产出合成命令脚本交你本地执行。
-- 混元生图、edge-tts 配音均为内置 / 免费，无需额外配置。
+- ImageGen 生图按张消耗平台积分；edge-tts 配音免费。建议优先在连接器信任 `agnes-ai` MCP 并填免费档密钥，用 Agnes 免费档生图实现零成本。
 
 ## 一句话使用
 把文案或想法丢给 WorkBuddy，加一句：
-> 用 free-short-drama 按这条文案做一条短视频：画面静图用混元 Hy Image 3.5 免费生图，动图走 Agnes 免费档，旁白用 edge-tts。
+> 用 free-short-drama 按这条文案做一条短视频：画面静图优先用 Agnes 免费档生图，未配置时退回混元 ImageGen（消耗积分），动图走 Agnes 免费档，旁白用 edge-tts。
 
 它会自动推进：故事内核 → 剧本分镜 → 形象锁定（三视图）→ 图生视频 + 配音 → 合成成片 → 宣发物料，产物落在 `drama-projects/<剧名>/`。
 
