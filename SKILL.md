@@ -1,6 +1,11 @@
 ---
 name: free-short-drama
+slug: free-short-drama
+displayName: "免费短视频全自动流水线"
 title: "免费短视频全自动流水线 free-short-drama"
+version: 1.0.0
+summary: "零外部依赖、可独立安装的 WorkBuddy 技能：输入一句话想法或文案，全自动产出成片+素材包+宣发物料。生图用混元 Hy Image 3.5，图生视频用 Agnes 免费档，配音 edge-tts，合成 ffmpeg，全流程外部花费≈0。"
+license: MIT
 description: "从一句话想法到成片的全自动短视频流水线，零外部技能依赖、可独立安装。生图用 WorkBuddy 内置免费混元 Hy Image 3.5，图生视频用 Agnes 免费档，配音用 edge-tts，合成用本地 ffmpeg。所有写作/分镜/形象/配音方法论已内嵌，无需 qianjin 系列即可完整运行；若 ~/.workbuddy/skills/qianjin-* 存在则自动增强。适用于用户想把文案或题材自动做成免费短视频、且不希望手动写剧本分镜的场景。"
 read_when:
   - 用户说"把想法免费做成短视频""一键出短剧""从文案自动生成视频""零成本做短视频"
