@@ -3,7 +3,7 @@ name: free-short-drama
 slug: free-short-drama
 displayName: "短视频全自动流水线"
 title: "短视频全自动流水线 free-short-drama"
-version: 1.0.1
+version: 1.1.0
 summary: "零外部依赖、可独立安装的 WorkBuddy 技能：输入一句话想法或文案，全自动产出成片+素材包+宣发物料。生图优先用 Agnes 免费档（agnes_generate_image），未配置时退回内置 ImageGen（Hy Image 3.5，按张消耗平台积分约 5-10/张）；图生视频用 Agnes 免费档，配音 edge-tts，合成 ffmpeg，仅生图环节可能消耗积分。"
 license: MIT
 description: "从一句话想法到成片的全自动短视频流水线，零外部技能依赖、可独立安装。生图优先用 Agnes 免费档（agnes_generate_image，需在连接器信任 agnes-ai MCP 并填免费档密钥），未配置时退回 WorkBuddy 内置 ImageGen（Hy Image 3.5，按张消耗平台积分约 5-10/张）；图生视频用 Agnes 免费档，配音用 edge-tts，合成用本地 ffmpeg。所有写作/分镜/形象/配音方法论已内嵌，无需 qianjin 系列即可完整运行；若 ~/.workbuddy/skills/qianjin-* 存在则自动增强。适用于用户想把文案或题材自动做成短视频、且不希望手动写剧本分镜的场景。"
@@ -22,7 +22,7 @@ agent_created: true
 
 ## 输入
 - 必要：一句话想法 / 题材方向 / 钩子 / 现成文案（如"国学向：己所不欲勿施于人"或一段分镜文案）
-- 可选：时长（默认 60s）、画幅（默认 9:16，国风可 16:9）、赛道（泰式神反转 / 国风情绪 / 都市爽文，默认按内容自判）、是否要配音 / BGM、目标平台
+- 可选：时长（默认 60s）、画幅（默认 9:16，国风可 16:9）、赛道（泰式神反转 / 国风情绪 / 都市爽文，默认按内容自判）、是否要配音 / BGM、目标平台（决定封面尺寸：抖音 / 视频号 / 小红书 = 竖屏 1080×1920，B站 / YouTube / 公众号 = 横屏 16:9）
 
 ## 全局原则
 1. **全自动优先**：除明显歧义（如性别 / 年代冲突无法自判）外，不要在每一步停下来问用户。自行决策并推进，每个阶段结束用一句话汇报进度即可。
@@ -35,7 +35,7 @@ agent_created: true
    - `clips/` 视频片段
    - `final/` 合成成片
    - `manifest.json` 供 drama-studio 平台导入
-   - `promo/` 宣发物料（多平台文案）
+   - `promo/` 宣发物料（多平台文案）+ 平台封面图 `promo/cover_vertical.png` / `promo/cover_horizontal.png`（Agnes 免费档生图，未配置时退回 ImageGen 混元消耗积分作备用）
 
 ## 工作流程（全自动，严格顺序）
 
@@ -60,10 +60,10 @@ agent_created: true
 
 ### 阶段3 角色形象锁定（含三视图）
 遍历角色清单，对每个主角：
-- 生图优先级：**优先用 Agnes 免费档** `agnes_generate_image` 生成「角色设定图」+「正面 / 侧面 / 全身三视图」（需在连接器官方页信任 `agnes-ai` MCP 并填入免费档密钥）；**未配置 Agnes 时退回** WorkBuddy 内置 ImageGen（Hy Image 3.5 preview，按张消耗平台积分约 5-10/张）作备用。
+- 生图优先级：**优先用 Agnes 免费档 `agnes_generate_image`** 生成「角色设定图」+「正面 / 侧面 / 全身三视图」（需在连接器官方页信任 `agnes-ai` MCP 并填免费档密钥，生图≈0 积分）。**未配置 Agnes 时退回** WorkBuddy 内置 ImageGen（混元 Hy Image 3.5，按张消耗平台积分约 5-10/张）作备用——注意混元生图会消耗积分，不要默认走它。
 - 按国风系 8 维（头部比例 3-5 头身写意 / 身体比例微含胸颔首溜肩宽袍大袖 / 五官细长凤眼单眼皮柳叶眉樱桃小口留白 50-60% / 色彩朱砂红藏青黛绿藤黄月白+金≤3% / 轮廓流动飘逸一波三折 / 记忆点朝代纹样+手持器物+发饰 / 情绪含蓄收幅度约为萌系 1/3 / 气质传统元素纯度+线条流动+色彩古韵+内敛）形成「形象锁定卡」文本，存 `characters/形象锁定卡.md`。
 - 三视图共用同一视觉描述防漂移。
-- Agnes 免费档已为默认生图通道；如角色多 / 需更精细 IP 继续用 Agnes 即可，必要时再退回 ImageGen（消耗积分）。
+- Agnes 同时负责图生视频（动图）与静图生图；未配置 Agnes 图生视频时退回 ImageGen 出关键帧 + 说明（视频合成需用户本地 ffmpeg / 剪映，并明确告知）。
 
 ### 阶段4 视频制作（图生视频 + 配音合成）
 - 图生视频：对每个分镜，以该镜头所需角色的「设定图 / 三视图」为参考，用图生视频能力产出动态片段。
@@ -78,8 +78,13 @@ agent_created: true
   `python scripts/build_vertical.py --project drama-projects/<剧名> --n <段数> [--gap 0.7 --tail 1.6 --w 1080 --h 1920]`
   前置：`images/img1..N.(png|jpg)` + `clips/audio/narr_i.mp3` & `words_i.json` + `transcript.txt`。
 
-### 阶段5 打包、导入与宣发复用
-- 生成 `manifest.json`（剧名 / 时长 / 分镜数 / 角色数 / 素材路径）。
+### 阶段5 封面生成 + 打包宣发复用
+- **封面图（Agnes 免费档优先）**：成片定稿后，优先用 Agnes 免费档 `agnes_generate_image` 生成平台封面图，按目标平台出尺寸：
+  - 竖屏 1080×1920（抖音 / 视频号 / 小红书）→ `promo/cover_vertical.png`
+  - 横屏 16:9（B站 / YouTube / 公众号）→ `promo/cover_horizontal.png`
+  - 构图：剧名主标题（大字、国风描边 / 烫金）+ 1 句钩子副标题 + 主角立绘或高光场景，配色与「形象锁定卡」一致；若未配置 Agnes，退回 ImageGen（混元，汉字更准但仍按张消耗积分约 5-10/张）作备用。
+  - 可选【片头封面帧】：用 ffmpeg 在成片开头拼接 2–3s 标题卡（由封面图 + ASS 标题文字合成）；不想烧进视频则仅交付封面图。给出合成命令 / 脚本，不臆造未实现参数。
+- 生成 `manifest.json`（剧名 / 时长 / 分镜数 / 角色数 / 素材路径 / 封面路径）。
 - 宣发：按一鱼多吃思路，把同一剧本 / 成片拆成公众号深度文、小红书图文、抖音口播、视频号短版，各平台适配结构与语气，存入 `promo/`。
 - 告知用户：可把 `drama-projects/<剧名>/` 作为素材包在 drama-studio 平台「素材库 / 作品库」上传；或把 manifest 直接导入平台。
 
@@ -98,7 +103,7 @@ agent_created: true
 ## 工具与资源
 - 写作：内嵌方法论（优先调用 `~/.workbuddy/skills/qianjin-novel-writer`（若有）/ `qianjin-writer`（若有），否则用内嵌三审法）
 - 形象：内嵌国风系 8 维（优先调用 `qianjin-ip-design`（若有），否则用内嵌 8 维）
-- 生图（优先级）：① Agnes MCP `agnes_generate_image`（免费档，优先）/ ② WorkBuddy 内置 ImageGen（Hy Image 3.5，按张消耗平台积分约 5-10 credits/张，Agnes 未配置时的备用）
+- 生图（静图优先级）：① **Agnes 免费档 `agnes_generate_image`（免费，默认）** 用于所有静图（角色设定图 / 三视图 / 场景图 / 带字画面 / 封面图）/ ② **未配置 Agnes 时退回** WorkBuddy 内置 ImageGen（混元 Hy Image 3.5，按张消耗平台积分约 5-10/张）作备用——混元生图会消耗积分，不要默认走它。
 - 视频：Agnes MCP（`agnes_generate_video`，免费档）/ 本地 ffmpeg 合成（`scripts/build_drama.sh` 管线）
 - 配音：edge-tts（免费，`scripts/gen_audio.py` + `scripts/gen_subs.py`）
 - 宣发：内嵌一鱼多吃思路（优先调用 `qianjin-content-repurposer`（若有））
@@ -107,4 +112,4 @@ agent_created: true
 - 不编造分镜号、不跳过角色一致性校验、不臆造素材路径。
 - 用户给的事实 / 价格 / 数据先核实再落稿。
 - 全流程不要求用户手搓；只在「无法消歧的关键决策」时一次性询问（默认自判）。
-- 若启用 Agnes：单次免费档需串行、段与段间隔 ≥30 秒防 429；开工前一句话告知用户预计算力成本（生图约 5-10 credit/张，视频为大消耗）。
+- 若启用 Agnes：单次免费档需串行、段与段间隔 ≥30 秒防 429；开工前一句话告知用户预计算力成本（Agnes 生图 / 视频免费档≈0，仅当退回内置 ImageGen 备用时静图按张消耗约 5-10 积分/张）。
