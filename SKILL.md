@@ -1,16 +1,16 @@
 ---
 name: free-short-drama
 slug: free-short-drama
-displayName: "免费短视频全自动流水线"
-title: "免费短视频全自动流水线 free-short-drama"
-version: 1.0.0
-summary: "零外部依赖、可独立安装的 WorkBuddy 技能：输入一句话想法或文案，全自动产出成片+素材包+宣发物料。生图用混元 Hy Image 3.5，图生视频用 Agnes 免费档，配音 edge-tts，合成 ffmpeg，全流程外部花费≈0。"
+displayName: "短视频全自动流水线"
+title: "短视频全自动流水线 free-short-drama"
+version: 1.0.1
+summary: "零外部依赖、可独立安装的 WorkBuddy 技能：输入一句话想法或文案，全自动产出成片+素材包+宣发物料。生图优先用 Agnes 免费档（agnes_generate_image），未配置时退回内置 ImageGen（Hy Image 3.5，按张消耗平台积分约 5-10/张）；图生视频用 Agnes 免费档，配音 edge-tts，合成 ffmpeg，仅生图环节可能消耗积分。"
 license: MIT
-description: "从一句话想法到成片的全自动短视频流水线，零外部技能依赖、可独立安装。生图用 WorkBuddy 内置免费混元 Hy Image 3.5，图生视频用 Agnes 免费档，配音用 edge-tts，合成用本地 ffmpeg。所有写作/分镜/形象/配音方法论已内嵌，无需 qianjin 系列即可完整运行；若 ~/.workbuddy/skills/qianjin-* 存在则自动增强。适用于用户想把文案或题材自动做成免费短视频、且不希望手动写剧本分镜的场景。"
+description: "从一句话想法到成片的全自动短视频流水线，零外部技能依赖、可独立安装。生图优先用 Agnes 免费档（agnes_generate_image，需在连接器信任 agnes-ai MCP 并填免费档密钥），未配置时退回 WorkBuddy 内置 ImageGen（Hy Image 3.5，按张消耗平台积分约 5-10/张）；图生视频用 Agnes 免费档，配音用 edge-tts，合成用本地 ffmpeg。所有写作/分镜/形象/配音方法论已内嵌，无需 qianjin 系列即可完整运行；若 ~/.workbuddy/skills/qianjin-* 存在则自动增强。适用于用户想把文案或题材自动做成短视频、且不希望手动写剧本分镜的场景。"
 read_when:
   - 用户说"把想法免费做成短视频""一键出短剧""从文案自动生成视频""零成本做短视频"
   - 用户提供一个题材/钩子/文案，要求系统自动完成写作、分镜、生图、视频且不依赖其他技能
-  - 用户希望不手动写剧本/分镜，全流程自动产出且尽量免费
+  - 用户希望不手动写剧本/分镜，全流程自动产出且尽量零成本（生图优先 Agnes 免费档）
 agent_created: true
 ---
 
@@ -60,18 +60,23 @@ agent_created: true
 
 ### 阶段3 角色形象锁定（含三视图）
 遍历角色清单，对每个主角：
-- 用 WorkBuddy 内置免费生图（Hy Image 3.5 preview，ImageGen 工具）生成「角色设定图」+「正面 / 侧面 / 全身三视图」，写入 `characters/<角色名>_main.png` 与 `characters/<角色名>_三视图.png`。
+- 生图优先级：**优先用 Agnes 免费档** `agnes_generate_image` 生成「角色设定图」+「正面 / 侧面 / 全身三视图」（需在连接器官方页信任 `agnes-ai` MCP 并填入免费档密钥）；**未配置 Agnes 时退回** WorkBuddy 内置 ImageGen（Hy Image 3.5 preview，按张消耗平台积分约 5-10/张）作备用。
 - 按国风系 8 维（头部比例 3-5 头身写意 / 身体比例微含胸颔首溜肩宽袍大袖 / 五官细长凤眼单眼皮柳叶眉樱桃小口留白 50-60% / 色彩朱砂红藏青黛绿藤黄月白+金≤3% / 轮廓流动飘逸一波三折 / 记忆点朝代纹样+手持器物+发饰 / 情绪含蓄收幅度约为萌系 1/3 / 气质传统元素纯度+线条流动+色彩古韵+内敛）形成「形象锁定卡」文本，存 `characters/形象锁定卡.md`。
 - 三视图共用同一视觉描述防漂移。
-- 若角色多 / 需更精细 IP，可切换 Agnes（`agnes_generate_image`）。
+- Agnes 免费档已为默认生图通道；如角色多 / 需更精细 IP 继续用 Agnes 即可，必要时再退回 ImageGen（消耗积分）。
 
 ### 阶段4 视频制作（图生视频 + 配音合成）
 - 图生视频：对每个分镜，以该镜头所需角色的「设定图 / 三视图」为参考，用图生视频能力产出动态片段。
   - 优先 Agnes `agnes_generate_video`（agnes-video-v2.0，异步，需用户在连接器页信任 `agnes-ai` MCP 并填免费档密钥）。
   - 未配置 Agnes 时退回 ImageGen 出关键帧 + 说明（视频合成需用户本地 ffmpeg / 剪映，并明确告知）。
-- 配音：按角色分配音色生成 TTS 音频。用 edge-tts 中文自然语音（默认 YunjianNeural 男声），对齐分镜时间轴。可用本技能 `scripts/gen_audio.py` 生成 `narr_i.mp3` 并输出逐字时间戳 `words_i.json`（必须用 `boundary="WordBoundary"` 拿词级时间戳；edge-tts 7.2.8 会强制转义文本，不支持 SSML/phoneme 强制多音字）。
+- 配音：按角色分配音色生成 TTS 音频。用 edge-tts 中文自然语音（默认 YunjianNeural 男声；治愈/情绪流可用 XiaoxiaoNeural 女声），对齐分镜时间轴。可用本技能 `scripts/gen_audio.py` 生成 `narr_i.mp3` 并输出逐字时间戳 `words_i.json`（必须用 `boundary="WordBoundary"` 拿词级时间戳；edge-tts 7.2.8 会强制转义文本，不支持 SSML/phoneme 强制多音字）。
+  - `--rate=-12%` 整体降速、`--pitch=-1Hz` 微降音高，可显著提升治愈/内省质感；**必须用 `--rate=-12%` 等号写法**，否则 `-12%` 会被 argparse 当成选项报错。
+  - gen_audio.py 内取词边界与保存音频**必须用两个独立 Communicate 对象**（edge-tts 的 `stream()` 只能调用一次，否则报 "stream can only be called once"）。
 - 字幕：用本技能 `scripts/gen_subs.py` 由词边界生成 `subs.srt`（底部词级同步台词）+ `subs_names.srt`（顶部金色人名条）。**禁止按"段时长均分行数"猜时间轴**（语速不均会造成字幕滞后、观众"每句开头几个字听不见"的错觉）；每行起止 = 行内首词起（-50ms 提前出字）~ 末词止（+200ms）。
-- 合成：有 ffmpeg 时，用本技能 `scripts/build_drama.sh` 把「片段 + 配音 + 字幕」合成为 `final/<剧名>.mp4`；无 ffmpeg 时产出「合成命令脚本 + 素材清单」交付用户本地执行。
+- 合成（横屏 16:9 剧情片）：有 ffmpeg 时，用本技能 `scripts/build_drama.sh` 把「片段 + 配音 + 字幕」合成为 `final/<剧名>.mp4`；无 ffmpeg 时产出「合成命令脚本 + 素材清单」交付用户本地执行。
+- 合成（竖屏 9:16 / 情绪流·图文口播）：用本技能 `scripts/build_vertical.py`。它是 `build_drama.sh` 的竖屏升级版，专治「图片 + 旁白 + 字幕」型短片：图片做 ken-burns 缓慢推近（免图生视频也有动感）、自动裁掉生图水印条、段间留呼吸停顿、片尾留白，并直接生成词级同步 ASS 字幕（竖屏安全边距）。用法：
+  `python scripts/build_vertical.py --project drama-projects/<剧名> --n <段数> [--gap 0.7 --tail 1.6 --w 1080 --h 1920]`
+  前置：`images/img1..N.(png|jpg)` + `clips/audio/narr_i.mp3` & `words_i.json` + `transcript.txt`。
 
 ### 阶段5 打包、导入与宣发复用
 - 生成 `manifest.json`（剧名 / 时长 / 分镜数 / 角色数 / 素材路径）。
@@ -93,7 +98,7 @@ agent_created: true
 ## 工具与资源
 - 写作：内嵌方法论（优先调用 `~/.workbuddy/skills/qianjin-novel-writer`（若有）/ `qianjin-writer`（若有），否则用内嵌三审法）
 - 形象：内嵌国风系 8 维（优先调用 `qianjin-ip-design`（若有），否则用内嵌 8 维）
-- 生图：ImageGen（WorkBuddy 内置免费 Hy Image 3.5，默认）/ Agnes MCP（`agnes_generate_image`）
+- 生图（优先级）：① Agnes MCP `agnes_generate_image`（免费档，优先）/ ② WorkBuddy 内置 ImageGen（Hy Image 3.5，按张消耗平台积分约 5-10 credits/张，Agnes 未配置时的备用）
 - 视频：Agnes MCP（`agnes_generate_video`，免费档）/ 本地 ffmpeg 合成（`scripts/build_drama.sh` 管线）
 - 配音：edge-tts（免费，`scripts/gen_audio.py` + `scripts/gen_subs.py`）
 - 宣发：内嵌一鱼多吃思路（优先调用 `qianjin-content-repurposer`（若有））
