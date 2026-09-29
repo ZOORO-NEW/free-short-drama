@@ -3,7 +3,7 @@ name: free-short-drama
 slug: free-short-drama
 displayName: "短视频全自动流水线"
 title: "短视频全自动流水线 free-short-drama"
-version: 1.1.0
+version: 1.1.1
 summary: "零外部依赖、可独立安装的 WorkBuddy 技能：输入一句话想法或文案，全自动产出成片+素材包+宣发物料。生图优先用 Agnes 免费档（agnes_generate_image），未配置时退回内置 ImageGen（Hy Image 3.5，按张消耗平台积分约 5-10/张）；图生视频用 Agnes 免费档，配音 edge-tts，合成 ffmpeg，仅生图环节可能消耗积分。"
 license: MIT
 description: "从一句话想法到成片的全自动短视频流水线，零外部技能依赖、可独立安装。生图优先用 Agnes 免费档（agnes_generate_image，需在连接器信任 agnes-ai MCP 并填免费档密钥），未配置时退回 WorkBuddy 内置 ImageGen（Hy Image 3.5，按张消耗平台积分约 5-10/张）；图生视频用 Agnes 免费档，配音用 edge-tts，合成用本地 ffmpeg。所有写作/分镜/形象/配音方法论已内嵌，无需 qianjin 系列即可完整运行；若 ~/.workbuddy/skills/qianjin-* 存在则自动增强。适用于用户想把文案或题材自动做成短视频、且不希望手动写剧本分镜的场景。"
@@ -69,7 +69,7 @@ agent_created: true
 - 图生视频：对每个分镜，以该镜头所需角色的「设定图 / 三视图」为参考，用图生视频能力产出动态片段。
   - 优先 Agnes `agnes_generate_video`（agnes-video-v2.0，异步，需用户在连接器页信任 `agnes-ai` MCP 并填免费档密钥）。
   - 未配置 Agnes 时退回 ImageGen 出关键帧 + 说明（视频合成需用户本地 ffmpeg / 剪映，并明确告知）。
-- 配音：按角色分配音色生成 TTS 音频。用 edge-tts 中文自然语音（默认 YunjianNeural 男声；治愈/情绪流可用 XiaoxiaoNeural 女声），对齐分镜时间轴。可用本技能 `scripts/gen_audio.py` 生成 `narr_i.mp3` 并输出逐字时间戳 `words_i.json`（必须用 `boundary="WordBoundary"` 拿词级时间戳；edge-tts 7.2.8 会强制转义文本，不支持 SSML/phoneme 强制多音字）。
+- 配音：按角色分配音色生成 TTS 音频。用 edge-tts 中文自然语音（**默认 YunjianNeural 男声，治愈/情绪流首选**——实测真人感最佳；`XiaoxiaoNeural`/`XiaoyiNeural`/`YunyangNeural` 电子感/合成感偏重，情感片慎用），对齐分镜时间轴。可用本技能 `scripts/gen_audio.py` 生成 `narr_i.mp3` 并输出逐字时间戳 `words_i.json`（必须用 `boundary="WordBoundary"` 拿词级时间戳；edge-tts 7.2.8 会强制转义文本，不支持 SSML/phoneme 强制多音字）。
   - `--rate=-12%` 整体降速、`--pitch=-1Hz` 微降音高，可显著提升治愈/内省质感；**必须用 `--rate=-12%` 等号写法**，否则 `-12%` 会被 argparse 当成选项报错。
   - gen_audio.py 内取词边界与保存音频**必须用两个独立 Communicate 对象**（edge-tts 的 `stream()` 只能调用一次，否则报 "stream can only be called once"）。
 - 字幕：用本技能 `scripts/gen_subs.py` 由词边界生成 `subs.srt`（底部词级同步台词）+ `subs_names.srt`（顶部金色人名条）。**禁止按"段时长均分行数"猜时间轴**（语速不均会造成字幕滞后、观众"每句开头几个字听不见"的错觉）；每行起止 = 行内首词起（-50ms 提前出字）~ 末词止（+200ms）。
@@ -77,6 +77,14 @@ agent_created: true
 - 合成（竖屏 9:16 / 情绪流·图文口播）：用本技能 `scripts/build_vertical.py`。它是 `build_drama.sh` 的竖屏升级版，专治「图片 + 旁白 + 字幕」型短片：图片做 ken-burns 缓慢推近（免图生视频也有动感）、自动裁掉生图水印条、段间留呼吸停顿、片尾留白，并直接生成词级同步 ASS 字幕（竖屏安全边距）。用法：
   `python scripts/build_vertical.py --project drama-projects/<剧名> --n <段数> [--gap 0.7 --tail 1.6 --w 1080 --h 1920]`
   前置：`images/img1..N.(png|jpg)` + `clips/audio/narr_i.mp3` & `words_i.json` + `transcript.txt`。
+- 合成（横屏 16:9 / 治愈系·情绪流系列）：用本技能 `scripts/build_healing_16x9.py`。段数自动按 `transcript.txt` 行数适配；ken-burns 缓慢推近 + 自动裁生图水印条 + 段间呼吸停顿 + 词级同步底部字幕 + **BGM 铺底混音**（`bgm.wav` 缺失时用 ffmpeg lavfi 现场合成柔和和弦垫音，和弦由 `--bgm-chord` 指定）。用法：
+  `python scripts/build_healing_16x9.py --project drama-projects/<剧名> --title <片名> [--wm 0 --bgm-chord Em9 --bgm-vol 2.2]`
+  - **`--bgm-chord` 系列化必用**：脚本内置 `CHORDS` 表（C / Fmaj7 / Am9 / Gsus2 / Dmaj7 / Cadd9 / Em9 / Bbmaj7 / F#m7 / Amaj7 / **Ebmaj7 / Cmaj7 / Gmaj7 / Asus2**），每集换一种和弦避免 BGM 雷同；也支持自定义频率串（如 `220,277,330`）。
+  - **BGM 基调（第 10 集起，用户要求）**：**起伏轻微、氛围感强、不沉闷、心情愉悦轻松**。`synth_bgm` 已升级为「明亮·氛围感版」：`lowpass` 850→**4200Hz**（去闷）+ 每音 **±0.3% 失谐**（暖宽、缓慢拍频＝轻微起伏）+ **高八度 shimmer**（氛围感）+ 轻微慢呼吸；和弦优先**明亮大七/挂二**（Ebmaj7 / Cmaj7 / Gmaj7 / Asus2）。⚠️ 该版把主垫 `amix` 改为 `normalize=0` 且用失谐双振荡，源电平会**暴涨约 11dB**，故已加**总线增益 `volume=0.27`** 拉回 −34dB 基准（默认 `--bgm-vol 2.2` 仍可用）；若再调 `synth_bgm` 增益/失谐，**务必先 `synth_bgm(path,30,chord)` 生成测试文件重测源电平**。
+  - 生图用 Agnes 免费档（无水印）时加 `--wm 0`，用内置 ImageGen（带水印条）时保持 `--wm 72`。
+  - **验收（每集必做；第 09 集定型最稳测床法）**：读 `clips/audio/words_i.json` 末字的 `s+d` 减去 `TRIM=0.15` 得该段**人声真实结束点**，在其后 0.7~1.0s 处取 **0.3s 窗**测 `volumedetect`，读数即 BGM 床（无语音尾巴污染，比"按公式 gap 窗口"或首尾乱扫准；勿用 `silencedetect`——BGM 床高于其常见 −22dB 阈值，测不出）。目标 **−26dB（比人声低 8~9dB）**；床会随和弦源电平漂移 5~6dB，偏响调小 `--bgm-vol`（第 06 集 1.4、第 09 集 Bbmaj7 源 −34.3dB 仍需 1.6）、偏轻调大（第 05 集 2.6）。整体 mean 目标 −18.5 ~ −19.5dB，max 不超 −3dB。第 10 集起明亮版因失谐拍频（约 1~2.8Hz）床位会自然浮动 **±2dB**，均 ≈ −25dB 即可，不必强求贴 −26（本集用 `--bgm-vol 1.8`）。
+  前置：`transcript.txt`（每行一段）+ `images/img1..N.png` + `clips/audio/narr_i.mp3` & `words_i.json`；可选预置 `bgm.wav`。系列化追加新集见 `drama-projects/治愈系系列/index.md`。
+- **生图避坑（务必遵守）**：内置 ImageGen **同一条消息并行多张会因文件名精确到秒而互相覆盖且静默无报错** → 必须**串行**：一次只发一张，拿到 `localPath` 立刻改名归位（如 `mv .../g1/*.png images/img1.png`），再发下一张。`output_dir` 并发生成时会归一到同一目录，不可依赖。
 
 ### 阶段5 封面生成 + 打包宣发复用
 - **封面图（Agnes 免费档优先）**：成片定稿后，优先用 Agnes 免费档 `agnes_generate_image` 生成平台封面图，按目标平台出尺寸：
@@ -104,6 +112,12 @@ agent_created: true
 - 写作：内嵌方法论（优先调用 `~/.workbuddy/skills/qianjin-novel-writer`（若有）/ `qianjin-writer`（若有），否则用内嵌三审法）
 - 形象：内嵌国风系 8 维（优先调用 `qianjin-ip-design`（若有），否则用内嵌 8 维）
 - 生图（静图优先级）：① **Agnes 免费档 `agnes_generate_image`（免费，默认）** 用于所有静图（角色设定图 / 三视图 / 场景图 / 带字画面 / 封面图）/ ② **未配置 Agnes 时退回** WorkBuddy 内置 ImageGen（混元 Hy Image 3.5，按张消耗平台积分约 5-10/张）作备用——混元生图会消耗积分，不要默认走它。
+- **Agnes MCP 未连接时的直调兜底（免费，推荐）**：`~/.workbuddy/mcp.json` 里已配 `agnes-ai`（endpoint + key）时，即使 MCP 会话没连，也可用本技能 `scripts/agnes_batch_images.py` 直调 OpenAI 兼容接口 `POST /v1/images/generations`（模型 `agnes-image-2.1-flash`）批量串行生图：`python scripts/agnes_batch_images.py --prompts prompts.json --outdir images --size 1536x1024`。内置串行+重试+断点续跑（已存在的 imgN.png 跳过），落位即 `img1..N.png`；Agnes 图**无水印**，合成时传 `--wm 0`。
+- **生图并发坑（实测，必读）**：内置 ImageGen 的产出文件名只精确到秒（形如 `Chinese_traditional_ink_wash_g_2026-09-28T13-46-49.png`）。
+  **同一条消息里并行发起多张生图，落在同一秒的会互相覆盖**——实测一次并行 6 张，最后只剩 3 张，且**静默无报错**（只有等 `ls` 时才发现）。
+  因此：**多张生图必须串行**——一次只发一张，拿到返回的 `localPath` 后立即 `mv` 成 `images/imgN.png`，再发下一张。
+  另外 `output_dir` 在串行时会被遵守；并行时可能整体失效、全部落到同一目录。
+  若不慎已发生覆盖，可按「调用序号 + 秒级时间戳谁最后写入谁存活」反推幸存图是哪一张，只补生成丢失的那几张，避免重复烧积分。
 - 视频：Agnes MCP（`agnes_generate_video`，免费档）/ 本地 ffmpeg 合成（`scripts/build_drama.sh` 管线）
 - 配音：edge-tts（免费，`scripts/gen_audio.py` + `scripts/gen_subs.py`）
 - 宣发：内嵌一鱼多吃思路（优先调用 `qianjin-content-repurposer`（若有））
