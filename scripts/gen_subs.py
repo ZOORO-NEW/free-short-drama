@@ -14,6 +14,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 
 PUNCT = re.compile(r"[^\w\u4e00-\u9fff]")
 
@@ -46,6 +47,23 @@ def load_words(audiodir, i):
         return json.load(f)
 
 
+def audio_dur(audiodir, i):
+    """读取 narr_i.mp3 真实时长(秒)，与合成脚本 ffprobe 测得的 ADUR 一致，
+    用作字幕段间全局偏移基准。失败回退 None（外层用末词结束兜底）。"""
+    p = os.path.join(audiodir, f"narr_{i}.mp3")
+    if not os.path.exists(p):
+        return None
+    try:
+        out = subprocess.check_output(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "csv=p=0", p],
+            text=True, stderr=subprocess.DEVNULL)
+        v = float(out.strip())
+        return v if v > 0 else None
+    except Exception:
+        return None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--transcript", required=True)
@@ -65,7 +83,15 @@ def main():
         words = load_words(args.audiodir, i)
         segs[i] = words
         starts[i] = acc
-        dur = (words[-1]["s"] + words[-1]["d"] - args.trim) if words else 0.0
+        # 段时长必须用音频真实时长 ADUR（含 edge-tts 尾静音），不能用末词结束时间，
+        # 否则段间偏移系统性偏小、逐段累积错位。与合成脚本 ADUR 完全一致。
+        adur = audio_dur(args.audiodir, i)
+        if adur is not None:
+            dur = adur - args.trim
+        elif words:
+            dur = words[-1]["s"] + words[-1]["d"] - args.trim
+        else:
+            dur = 0.0
         acc += max(dur, 0.0)
 
     out, idx = [], 1

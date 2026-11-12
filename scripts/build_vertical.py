@@ -30,6 +30,9 @@ import re
 import subprocess
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from build_healing_16x9 import motion_vf, MOTION_CYCLE, Z_CYCLES  # 复用同一套 Ken Burns 运镜实现
+
 PUNCT = re.compile(r"[^\w\u4e00-\u9fff]")
 FFMPEG, FFPROBE = "ffmpeg", "ffprobe"
 
@@ -82,13 +85,17 @@ def main():
     ap.add_argument("--gap", type=float, default=0.7, help="段间停顿秒")
     ap.add_argument("--tail", type=float, default=1.6, help="片尾留白秒")
     ap.add_argument("--trim-gap", default="", help="自定义逐段停顿, 逗号分隔, 覆盖 --gap")
-    ap.add_argument("--zmax", type=float, default=1.06, help="推近终值(1.04~1.10 更含蓄)")
+    ap.add_argument("--zmax", type=float, default=1.24, help="推近终值(strong 模式下会自动×1.18)")
     ap.add_argument("--watermark-crop", type=int, default=100, help="裁掉底部水印像素")
     ap.add_argument("--font-size", type=int, default=56)
     ap.add_argument("--margin-v", type=int, default=215, help="字幕距底像素(竖屏安全区)")
     ap.add_argument("--images-sub", default="images")
     ap.add_argument("--audio-sub", default="clips/audio")
     ap.add_argument("--out-name", default="")
+    ap.add_argument("--motion", default="strong", choices=["off", "soft", "strong"],
+                    help="运镜强度：strong=推拉+摇移(默认)/soft=含蓄/off=纯静帧")
+    ap.add_argument("--force", action="store_true",
+                    help="强制重建已存在的画面段(改运镜参数后必须加, 否则复用旧段)")
     a = ap.parse_args()
 
     B = os.path.abspath(a.project)
@@ -155,16 +162,24 @@ def main():
              f"scale={int(a.w*4/3)}:{int(a.h*4/3)}:force_original_aspect_ratio=increase,"
              f"crop={int(a.w*4/3)}:{int(a.h*4/3)},setsar=1", "-frames:v", "1", clean])
         D = max(2, round(targets[i-1] * a.fps))
-        rate = (a.zmax - 1.0) / D
-        vf = (f"zoompan=z='min(zoom+{rate:.6f},{a.zmax:.3f})':d={D}:"
-              f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={a.w}x{a.h}:fps={a.fps},format=yuv420p")
+        # 竖版源图是 3:2 大幅裁切到 9:16，构图余量比横版小得多，
+        # 运镜幅度需比横版更温和（否则裁掉主体、观感激进）。
+        if a.motion == "strong":
+            zmax = Z_CYCLES["strong"][(i-1) % len(Z_CYCLES["strong"])] * 0.92
+        elif a.motion == "soft":
+            zmax = a.zmax
+        else:
+            zmax = 1.0
+        preset = "off" if a.motion == "off" else MOTION_CYCLE[(i-1) % len(MOTION_CYCLE)]
+        vf = motion_vf(D, zmax, preset, a.w, a.h, a.fps)
         seg = os.path.join(CLIPS, f"seg{i}.mp4")
-        if not os.path.exists(seg):
+        # 原逻辑「seg 存在就跳过」会导致改了运镜参数后仍复用旧的静帧段 → 加 --force 才重建
+        if a.force or not os.path.exists(seg):
             run([FFMPEG, "-y", "-loglevel", "error", "-i", clean, "-vf", vf,
                  "-frames:v", str(D), "-r", str(a.fps), "-c:v", "libx264",
                  "-preset", "medium", "-crf", "19", "-pix_fmt", "yuv420p", seg])
         frames += D
-        print(f"seg{i}: {targets[i-1]:.3f}s frames={D}")
+        print(f"seg{i}: {targets[i-1]:.3f}s frames={D} motion={preset} zmax={zmax:.3f}")
 
     T = frames / a.fps
     comp = ("atrim=start=%.3f,asetpts=PTS-STARTPTS,"
